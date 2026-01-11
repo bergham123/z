@@ -1,69 +1,74 @@
 name: WhatsApp Bot Send
 
 on:
-  workflow_dispatch: # manual trigger only
+  workflow_dispatch: # Trigger manually from GitHub Actions tab
 
 jobs:
   send-messages:
     runs-on: ubuntu-latest
+    timeout-minutes: 15 # Give enough time to scan QR
 
     steps:
-      # ─── Checkout repo ─────────────────────
+      # ─── Checkout repo (Restores previous Session) ──────
       - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      # ─── Setup Node.js ────────────────────
+      # ─── Setup Node.js ───────────────────────────────────
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # ─── Install dependencies ─────────────
+      # ─── Install dependencies ────────────────────────────
       - name: Install dependencies
-        run: |
-          npm install
-          sudo apt-get update
-          sudo apt-get install -y wget gnupg ca-certificates
-          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst fonts-freefont-ttf libxss1 --no-install-recommends
+        run: npm install
 
-      # ─── Create session directory ─────────
-      - name: Create session directory
-        run: |
-          mkdir -p .wwebjs_auth
-          ls -la .wwebjs_auth/ || echo "No session directory yet"
-
-      # ─── Run WhatsApp bot ─────────────────
+      # ─── Run WhatsApp bot (Background) ──────────────────
+      # We run it in background so we can check for the QR file
       - name: Run bot
-        timeout-minutes: 30
-        env:
-          DISPLAY: ":99"
+        run: npm start &
+      
+      # ─── Handle QR Code (First Run Only) ─────────────────
+      - name: Wait for QR Code
         run: |
-          # Start virtual display for headless Chrome
-          /usr/bin/Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-          sleep 3
-          
-          # Run the bot
-          echo "Starting WhatsApp bot..."
-          node index.js || echo "Bot finished or encountered an error"
+          echo "Waiting for bot to generate QR..."
+          # Wait up to 60 seconds for qr.png to appear
+          timeout 60s bash -c "until [ -f ./qr.png ]; do sleep 1; done"
+          echo "QR Code found!"
+      
+      - name: Upload QR Code
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qr-code
+          path: ./qr.png
+          retention-days: 1
 
-      # ─── Commit progress, logs and session back ────
-      - name: Commit progress, logs and session
+      # ─── Wait for Bot to Finish Work ─────────────────────
+      # Now we bring the background process to foreground to see logs
+      - name: Wait for messages to send
+        run: |
+          echo "Bot is running. Scan the QR if this is the first time."
+          echo "Waiting for process to finish..."
+          wait
+
+      # ─── Save Session (The "Save Game") ───────────────────
+      # This saves the folder so you NEVER have to scan again
+      - name: Save Session & Progress
+        if: always() # Run even if there are errors
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Add all changed files
-          git add progress.json messages.txt .wwebjs_auth/
+          # Add the session folder (using -f because it might be ignored)
+          # .wwebjs_auth is the folder where LocalAuth saves the token
+          git add -f .wwebjs_auth
           
-          # Check if there are changes to commit
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Update progress, logs and session [skip ci]"
-            git push
-          fi
+          # Add progress and logs
+          git add progress.json messages.txt
+          
+          # Commit
+          git commit -m "Update session and progress [skip ci]" || echo "No changes to commit"
+          
+          # Push
+          git push
