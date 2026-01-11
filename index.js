@@ -1,133 +1,75 @@
-const fs = require("fs");
-const path = require("path");
-const qrcode = require("qrcode"); // Make sure to install this: npm install qrcode
-const { Client, LocalAuth, MessageMedia } = require("whatsapp-web.js");
+import { Client, LocalAuth } from "whatsapp-web.js";
+import qrcode from "qrcode-terminal";
+import fs from "fs-extra";
 
-// ─── CONFIG ─────────────────────────────
-const DELAY_MIN = 20 * 1000; 
-const DELAY_MAX = 60 * 1000; 
-const IMAGE_PATH = path.join(__dirname, "images.webp");
-const LINK = "https://your-site.com"; 
+const ACCOUNTS_FILE = "./accounts.json";
+const MESSAGE_FILE = "./message.txt";
+const DASHBOARD_DIR = "./dashboard";
+const ADMIN_NUMBER = "212642284241@c.us";
 
-const CONTACTS_FILE = path.join(__dirname, "contacts.json");
-const PROGRESS_FILE = path.join(__dirname, "progress.json");
-const LOG_FILE = path.join(__dirname, "messages.txt");
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+const randomDelay = () => 20000 + Math.floor(Math.random() * 20000);
 
-// ─── UTILS ─────────────────────────────
-function loadJSON(filePath, defaultData) {
-  try {
-    if (!fs.existsSync(filePath)) return defaultData;
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch {
-    return defaultData;
-  }
-}
+const today = new Date().toISOString().split("T")[0];
+const dashboardPath = `${DASHBOARD_DIR}/dashboard-${today}.json`;
 
-function saveJSON(filePath, data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-}
+await fs.ensureDir(DASHBOARD_DIR);
 
-function appendLog(line) {
-  fs.appendFileSync(LOG_FILE, line + "\n");
-}
+const dashboard = {
+  date: today,
+  total: 0,
+  sent: [],
+  failed: []
+};
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function random(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-// ─── LOAD CONTACTS & PROGRESS ──────────
-const contactsData = loadJSON(CONTACTS_FILE, { contacts: [] });
-const progress = loadJSON(PROGRESS_FILE, { sent: [] });
-const contacts = contactsData.contacts;
-
-const { generateMessage } = require("./textSpin.js");
-
-// ─── WHATSAPP CLIENT ──────────────────
 const client = new Client({
-  authStrategy: new LocalAuth({ 
-      clientId: "hello-bot",
-      dataPath: "./.wwebjs_auth" // Explicitly define where to save session
-  }),
+  authStrategy: new LocalAuth(),
   puppeteer: {
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-accelerated-2d-canvas",
-      "--no-first-run",
-      "--no-zygote",
-      "--disable-gpu",
-    ],
-  },
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    headless: true
+  }
 });
 
-// ─── QR & AUTH HANDLERS ───────────────
-client.on("qr", async (qr) => {
-  console.log("\nQR RECEIVED. Saving to qr.png...");
-  // Save QR to file so we can download it from GitHub Actions Artifacts
-  await qrcode.toFile('./qr.png', qr);
-  console.log("Scan the QR code in the Artifacts section of this run.");
+client.on("qr", qr => {
+  console.log("🔐 Scan QR:");
+  qrcode.generate(qr, { small: true });
 });
-
-client.on("authenticated", () => {
-  console.log("✅ Authenticated! Saving session...");
-});
-
-client.on("auth_failure", (msg) => console.error("❌ Auth failure:", msg));
 
 client.on("ready", async () => {
-  console.log("🤖 Bot ready. Checking for saved session...");
-  
-  // Delete the QR file since we don't need it anymore (cleanup)
-  if (fs.existsSync("./qr.png")) fs.unlinkSync("./qr.png");
+  console.log("✅ WhatsApp Ready");
 
-  console.log("🚀 Sending messages...");
+  const numbers = await fs.readJson(ACCOUNTS_FILE);
+  const message = await fs.readFile(MESSAGE_FILE, "utf8");
 
-  let media = null;
-  if (fs.existsSync(IMAGE_PATH)) {
-    const imageData = fs.readFileSync(IMAGE_PATH);
-    media = new MessageMedia("image/webp", imageData.toString("base64"), "promo.webp");
-  }
+  for (const num of numbers) {
+    const chatId = `${num}@c.us`;
 
-  const nextContacts = contacts.filter((c) => !progress.sent.includes(c));
-
-  if (nextContacts.length === 0) {
-    console.log("✅ All contacts finished.");
-    process.exit(0);
-  }
-
-  for (const number of nextContacts) {
     try {
-      const text = generateMessage();
-      const fullMessage = media ? text + "\n" + LINK : text + "\n" + LINK;
-
-      if (media) {
-        await client.sendMessage(number + "@c.us", media, { caption: fullMessage });
-      } else {
-        await client.sendMessage(number + "@c.us", fullMessage);
-      }
-
-      const timestamp = new Date().toISOString();
-      appendLog(`[${timestamp}] SENT_TO:${number} MSG:${fullMessage}`);
-      progress.sent.push(number);
-      saveJSON(PROGRESS_FILE, progress);
-
-      const wait = random(DELAY_MIN, DELAY_MAX);
-      console.log(`⏱ Waiting ${wait / 1000}s...`);
-      await delay(wait);
+      await client.sendMessage(chatId, message);
+      dashboard.sent.push(num);
+      dashboard.total++;
+      console.log(`✔ Sent to ${num}`);
     } catch (err) {
-      console.error("Error sending to", number, err);
+      dashboard.failed.push(num);
+      console.log(`❌ Failed ${num}`);
     }
+
+    const delay = randomDelay();
+    console.log(`⏳ Waiting ${delay / 1000}s`);
+    await wait(delay);
   }
 
-  console.log("✅ Batch complete.");
+  await fs.writeJson(dashboardPath, dashboard, { spaces: 2 });
+
+  await client.sendMessage(
+    ADMIN_NUMBER,
+    `✅ WhatsApp Automation Finished
+📅 Date: ${today}
+📤 Total Sent: ${dashboard.total}`
+  );
+
+  console.log("📊 Dashboard saved");
   process.exit(0);
 });
 
-// ─── INITIALIZE CLIENT ───────────────
 client.initialize();
