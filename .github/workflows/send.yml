@@ -32,10 +32,6 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          # ignore only inside actions
-          git update-index --assume-unchanged .wwebjs_cache || true
-          git update-index --assume-unchanged node_modules || true
-          git update-index --assume-unchanged package-lock.json || true
 
           # commit only dashboards
           git add dashboard
