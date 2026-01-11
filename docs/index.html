@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WhatsApp Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.3/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 p-6">
+
+  <h1 class="text-3xl font-bold mb-6">WhatsApp Automation Dashboard</h1>
+
+  <table id="aggregateTable" class="display table-auto w-full bg-white rounded shadow">
+    <thead>
+      <tr class="bg-gray-200">
+        <th>Date</th>
+        <th>Total Sent</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- Modal for detail -->
+  <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden justify-center items-center">
+    <div class="bg-white p-6 rounded shadow-lg w-11/12 max-w-3xl">
+      <h2 class="text-xl font-bold mb-4">Details for <span id="modalDate"></span></h2>
+      <table id="detailTable" class="table-auto w-full border">
+        <thead class="bg-gray-200">
+          <tr>
+            <th class="p-2 border">Number</th>
+            <th class="p-2 border">Status</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button id="closeModal" class="mt-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">Close</button>
+    </div>
+  </div>
+
+ <script>
+  const aggregateFile = 'https://raw.githubusercontent.com/bergham123/z/main/aggregate.json';
+  const dashboardBaseURL = 'https://raw.githubusercontent.com/bergham123/z/main/dashboard/';
+
+  $(document).ready(async function() {
+    const aggregate = await $.getJSON(aggregateFile);
+    const tbody = $('#aggregateTable tbody');
+
+    aggregate.forEach(item => {
+      const row = $(`<tr class="cursor-pointer hover:bg-gray-100" data-date="${item.date}">
+                      <td class="p-2 border">${item.date}</td>
+                      <td class="p-2 border">${item.total}</td>
+                    </tr>`);
+      tbody.append(row);
+    });
+
+    const table = $('#aggregateTable').DataTable({
+      pageLength: 10,
+      lengthMenu: [5,10,25,50],
+    });
+
+    $('#aggregateTable tbody').on('click', 'tr', async function() {
+      const date = $(this).data('date');
+      $('#modalDate').text(date);
+
+      const detailURL = dashboardBaseURL + `dashboard-${date}.json`;
+      const detailData = await $.getJSON(detailURL);
+
+      const detailTbody = $('#detailTable tbody');
+      detailTbody.empty();
+
+      detailData.sent.forEach(num => {
+        detailTbody.append(`<tr><td class="p-2 border">${num}</td><td class="p-2 border text-green-600">Sent</td></tr>`);
+      });
+
+      detailData.failed.forEach(num => {
+        detailTbody.append(`<tr><td class="p-2 border">${num}</td><td class="p-2 border text-red-600">Failed</td></tr>`);
+      });
+
+      $('#detailModal').removeClass('hidden').addClass('flex');
+    });
+
+    $('#closeModal').click(() => {
+      $('#detailModal').addClass('hidden').removeClass('flex');
+    });
+  });
+</script>
+
+
+</body>
+</html>
