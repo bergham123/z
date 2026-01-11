@@ -1,0 +1,40 @@
+<form id="dataForm">
+  <input type="text" id="name" placeholder="Your name" required />
+  <input type="text" id="message" placeholder="Your message" required />
+  <button type="submit">Save</button>
+</form>
+<p id="status"></p>
+
+
+<script>
+async function updateAccounts(newNumber) {
+  const filePath = 'accounts.json';
+  const token = 'YOUR_GITHUB_PERSONAL_ACCESS_TOKEN';
+
+  // 1️⃣ Fetch existing file
+  const fileResp = await fetch(`https://api.github.com/repos/bergham123/z/contents/${filePath}`);
+  const fileData = await fileResp.json();
+  const sha = fileData.sha;
+  const content = JSON.parse(atob(fileData.content));
+
+  // 2️⃣ Add new number
+  content.push(newNumber);
+
+  // 3️⃣ Update file
+  const updateResp = await fetch(`https://api.github.com/repos/bergham123/z/contents/${filePath}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `token ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      message: 'Update accounts.json',
+      content: btoa(JSON.stringify(content, null, 2)),
+      sha: sha
+    })
+  });
+
+  const result = await updateResp.json();
+  console.log(result);
+}
+</script>
