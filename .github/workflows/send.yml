@@ -3,12 +3,17 @@ name: WhatsApp Automation
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write   # ✅ THIS FIXES 403
+
 jobs:
   run:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
       - uses: actions/setup-node@v4
         with:
@@ -19,8 +24,8 @@ jobs:
 
       - name: Commit dashboard
         run: |
-          git config user.name "bot"
-          git config user.email "bot@github.com"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
           git add .
           git commit -m "update dashboard $(date +%F)" || echo "No changes"
           git push
