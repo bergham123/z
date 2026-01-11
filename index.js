@@ -3,11 +3,13 @@ const { Client, LocalAuth } = pkg;
 
 import qrcode from "qrcode-terminal";
 import fs from "fs-extra";
+import path from "path";
 
 const ACCOUNTS_FILE = "./accounts.json";
 const MESSAGE_FILE = "./message.txt";
 const DASHBOARD_DIR = "./dashboard";
 const SESSION_DIR = "./session";
+const AGGREGATE_FILE = "./aggregate.json";
 const ADMIN_NUMBER = "212642284241@c.us";
 
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
@@ -26,7 +28,7 @@ const dashboard = {
   failed: []
 };
 
-// initialize WhatsApp client with session
+// Initialize WhatsApp client with session
 const client = new Client({
   authStrategy: new LocalAuth({
     clientId: "main",
@@ -46,7 +48,7 @@ client.on("qr", qr => {
 client.on("ready", async () => {
   console.log("✅ WhatsApp Ready");
 
-  // read numbers & message
+  // Read accounts and message
   if (!await fs.pathExists(ACCOUNTS_FILE)) {
     throw new Error("accounts.json not found!");
   }
@@ -64,14 +66,28 @@ client.on("ready", async () => {
       dashboard.failed.push(num);
       console.log(`❌ Failed ${num} → ${err.message}`);
     }
-
     const delay = randomDelay();
     console.log(`⏳ Waiting ${delay / 1000}s`);
     await wait(delay);
   }
 
+  // Save today's dashboard
   await fs.writeJson(dashboardPath, dashboard, { spaces: 2 });
+  console.log("📊 Dashboard saved");
 
+  // ===== Aggregate JSON =====
+  const allDashboards = await fs.readdir(DASHBOARD_DIR);
+  const aggregate = [];
+  for (const file of allDashboards) {
+    if (file.endsWith(".json")) {
+      const data = await fs.readJson(path.join(DASHBOARD_DIR, file));
+      aggregate.push({ date: data.date, total: data.total });
+    }
+  }
+  await fs.writeJson(AGGREGATE_FILE, aggregate, { spaces: 2 });
+  console.log("📊 Aggregate JSON updated");
+
+  // Send report to admin
   await client.sendMessage(
     ADMIN_NUMBER,
     `✅ WhatsApp Automation Finished
@@ -79,7 +95,6 @@ client.on("ready", async () => {
 📤 Total Sent: ${dashboard.total}`
   );
 
-  console.log("📊 Dashboard saved and report sent");
   process.exit(0);
 });
 
