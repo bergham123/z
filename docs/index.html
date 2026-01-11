@@ -1,92 +1,420 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>WhatsApp Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WhatsApp Automation Dashboard</title>
+
+  <!-- Tailwind -->
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.3/dist/tailwind.min.css" rel="stylesheet">
+
+  <!-- jQuery + DataTables -->
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+  <style>
+    /* Make DataTables play nicer with Tailwind */
+    .dataTables_wrapper .dataTables_filter input,
+    .dataTables_wrapper .dataTables_length select {
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      padding: 0.4rem 0.6rem;
+      outline: none;
+    }
+    .dataTables_wrapper .dataTables_filter input:focus,
+    .dataTables_wrapper .dataTables_length select:focus {
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 3px rgba(147,197,253,0.35);
+    }
+    table.dataTable thead th {
+      border-bottom: 1px solid #e5e7eb !important;
+    }
+    table.dataTable.no-footer {
+      border-bottom: 1px solid #e5e7eb !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+      border-radius: 0.5rem !important;
+      border: 1px solid transparent !important;
+      margin: 0 2px !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+      background: #111827 !important;
+      color: white !important;
+      border: 1px solid #111827 !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+      background: #f3f4f6 !important;
+      color: #111827 !important;
+      border: 1px solid #e5e7eb !important;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 text-gray-800 p-6">
 
-  <h1 class="text-3xl font-bold mb-6">WhatsApp Automation Dashboard</h1>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <div class="max-w-6xl mx-auto px-4 py-8">
 
-  <table id="aggregateTable" class="display table-auto w-full bg-white rounded shadow">
-    <thead>
-      <tr class="bg-gray-200">
-        <th>Date</th>
-        <th>Total Sent</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+    <!-- Header -->
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">WhatsApp Automation Dashboard</h1>
+        <p class="text-slate-600 mt-1">Daily sending summary + per-day delivery details.</p>
+      </div>
 
-  <!-- Modal for detail -->
-  <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden justify-center items-center">
-    <div class="bg-white p-6 rounded shadow-lg w-11/12 max-w-3xl">
-      <h2 class="text-xl font-bold mb-4">Details for <span id="modalDate"></span></h2>
-      <table id="detailTable" class="table-auto w-full border">
-        <thead class="bg-gray-200">
-          <tr>
-            <th class="p-2 border">Number</th>
-            <th class="p-2 border">Status</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-      <button id="closeModal" class="mt-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">Close</button>
+      <div class="flex items-center gap-2">
+        <button id="refreshBtn"
+          class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 active:scale-[0.99] transition">
+          <span class="font-medium">Refresh</span>
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+            <path d="M21 3v6h-6"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
+        <div class="text-sm text-slate-500">Total Days</div>
+        <div id="statDays" class="mt-2 text-2xl font-bold">—</div>
+      </div>
+      <div class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
+        <div class="text-sm text-slate-500">Total Sent (All Days)</div>
+        <div id="statTotal" class="mt-2 text-2xl font-bold">—</div>
+      </div>
+      <div class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
+        <div class="text-sm text-slate-500">Latest Date</div>
+        <div id="statLatest" class="mt-2 text-2xl font-bold">—</div>
+      </div>
+    </div>
+
+    <!-- Table Card -->
+    <div class="rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+        <div>
+          <h2 class="font-semibold">Daily Aggregate</h2>
+          <p class="text-sm text-slate-500">Click a row to view numbers and statuses.</p>
+        </div>
+        <div id="loadingBadge" class="hidden text-sm text-slate-600">
+          <span class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1">
+            <span class="w-2 h-2 rounded-full bg-slate-400 animate-pulse"></span>
+            Loading…
+          </span>
+        </div>
+      </div>
+
+      <div class="p-5">
+        <div id="errorBox" class="hidden mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+          <div class="font-semibold">Couldn’t load data.</div>
+          <div class="text-sm mt-1" id="errorText"></div>
+        </div>
+
+        <table id="aggregateTable" class="display w-full">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Total Sent</th>
+              <th>Open</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <p class="text-xs text-slate-500 mt-3">
+          Tip: Use the search box above the table to quickly find a specific date.
+        </p>
+      </div>
     </div>
   </div>
 
- <script>
+  <!-- Modal -->
+  <div id="detailModal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/50"></div>
+
+    <div class="relative mx-auto my-8 w-[95%] max-w-4xl">
+      <div class="rounded-2xl bg-white shadow-xl border border-slate-200 overflow-hidden">
+        <div class="flex items-start justify-between px-5 py-4 border-b border-slate-200">
+          <div>
+            <h3 class="text-lg font-bold">Details</h3>
+            <p class="text-sm text-slate-500">For <span id="modalDate" class="font-semibold text-slate-700"></span></p>
+          </div>
+
+          <button id="closeModal" class="rounded-xl p-2 hover:bg-slate-100 active:scale-[0.98] transition" aria-label="Close">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6 6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="px-5 py-4">
+          <!-- Modal controls -->
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div class="flex items-center gap-2">
+              <span id="chipSent" class="text-xs rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1">Sent: —</span>
+              <span id="chipFailed" class="text-xs rounded-full bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1">Failed: —</span>
+              <span id="chipTotal" class="text-xs rounded-full bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1">Total: —</span>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <select id="statusFilter"
+                class="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-blue-100">
+                <option value="all">All</option>
+                <option value="sent">Sent</option>
+                <option value="failed">Failed</option>
+              </select>
+
+              <input id="detailSearch" type="text" placeholder="Search number…"
+                class="w-full sm:w-64 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-blue-100">
+            </div>
+          </div>
+
+          <!-- Table container -->
+          <div class="max-h-[65vh] overflow-auto rounded-xl border border-slate-200">
+            <table class="w-full text-sm">
+              <thead class="sticky top-0 bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th class="text-left p-3 font-semibold">Number</th>
+                  <th class="text-left p-3 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody id="detailTbody"></tbody>
+            </table>
+          </div>
+
+          <div id="detailLoading" class="hidden mt-4 text-sm text-slate-600">
+            <span class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1">
+              <span class="w-2 h-2 rounded-full bg-slate-400 animate-pulse"></span>
+              Loading details…
+            </span>
+          </div>
+
+          <div id="detailError" class="hidden mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm"></div>
+
+          <div class="mt-5 flex justify-end gap-2">
+            <button id="copyBtn"
+              class="rounded-xl border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50 active:scale-[0.99] transition">
+              Copy visible
+            </button>
+            <button id="closeModalFooter"
+              class="rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 active:scale-[0.99] transition">
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
   const aggregateFile = 'https://raw.githubusercontent.com/bergham123/z/main/aggregate.json';
   const dashboardBaseURL = 'https://raw.githubusercontent.com/bergham123/z/main/dashboard/';
 
-  $(document).ready(async function() {
-    const aggregate = await $.getJSON(aggregateFile);
-    const tbody = $('#aggregateTable tbody');
+  let aggregateTableInstance = null;
 
-    aggregate.forEach(item => {
-      const row = $(`<tr class="cursor-pointer hover:bg-gray-100" data-date="${item.date}">
-                      <td class="p-2 border">${item.date}</td>
-                      <td class="p-2 border">${item.total}</td>
-                    </tr>`);
-      tbody.append(row);
+  function showLoading(on) {
+    $('#loadingBadge').toggleClass('hidden', !on);
+  }
+
+  function showError(message) {
+    $('#errorText').text(message || 'Unknown error');
+    $('#errorBox').removeClass('hidden');
+  }
+
+  function hideError() {
+    $('#errorBox').addClass('hidden');
+    $('#errorText').text('');
+  }
+
+  function openModal() {
+    $('#detailModal').removeClass('hidden');
+    $('body').addClass('overflow-hidden');
+  }
+
+  function closeModal() {
+    $('#detailModal').addClass('hidden');
+    $('body').removeClass('overflow-hidden');
+    $('#detailSearch').val('');
+    $('#statusFilter').val('all');
+  }
+
+  function statusChip(status) {
+    if (status === 'Sent') {
+      return `<span class="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 text-xs font-medium">Sent</span>`;
+    }
+    return `<span class="inline-flex items-center rounded-full bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 text-xs font-medium">Failed</span>`;
+  }
+
+  function renderDetailRows(data) {
+    // Build combined rows: {number, status}
+    const rows = [];
+    (data.sent || []).forEach(n => rows.push({ number: String(n), status: 'Sent' }));
+    (data.failed || []).forEach(n => rows.push({ number: String(n), status: 'Failed' }));
+
+    // Sort optional: Sent first, then Failed (or remove sort if not desired)
+    rows.sort((a, b) => a.status.localeCompare(b.status) || a.number.localeCompare(b.number));
+
+    // Render
+    const tbody = $('#detailTbody');
+    tbody.empty();
+    rows.forEach(r => {
+      tbody.append(`
+        <tr class="border-b border-slate-100 hover:bg-slate-50">
+          <td class="p-3 font-mono text-[13px]">${escapeHtml(r.number)}</td>
+          <td class="p-3">${statusChip(r.status)}</td>
+        </tr>
+      `);
     });
 
-    const table = $('#aggregateTable').DataTable({
-      pageLength: 10,
-      lengthMenu: [5,10,25,50],
+    // Update chips
+    const sentCount = (data.sent || []).length;
+    const failedCount = (data.failed || []).length;
+    $('#chipSent').text(`Sent: ${sentCount}`);
+    $('#chipFailed').text(`Failed: ${failedCount}`);
+    $('#chipTotal').text(`Total: ${sentCount + failedCount}`);
+
+    // Apply filters after rendering
+    applyDetailFilter();
+  }
+
+  function applyDetailFilter() {
+    const filter = $('#statusFilter').val();
+    const q = ($('#detailSearch').val() || '').toLowerCase();
+
+    $('#detailTbody tr').each(function() {
+      const number = $(this).find('td').eq(0).text().toLowerCase();
+      const statusText = $(this).find('td').eq(1).text().toLowerCase(); // "sent"/"failed"
+      const matchText = !q || number.includes(q);
+      const matchStatus = (filter === 'all') || statusText.includes(filter);
+      $(this).toggle(matchText && matchStatus);
     });
+  }
 
-    $('#aggregateTable tbody').on('click', 'tr', async function() {
-      const date = $(this).data('date');
-      $('#modalDate').text(date);
+  function escapeHtml(str) {
+    return String(str)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
 
+  async function loadAggregate() {
+    hideError();
+    showLoading(true);
+
+    try {
+      const aggregate = await $.getJSON(aggregateFile);
+
+      // Stats
+      const totalDays = aggregate.length;
+      const totalSent = aggregate.reduce((sum, x) => sum + (Number(x.total) || 0), 0);
+      const latestDate = aggregate
+        .map(x => x.date)
+        .sort()
+        .slice(-1)[0] || '—';
+
+      $('#statDays').text(totalDays);
+      $('#statTotal').text(totalSent.toLocaleString());
+      $('#statLatest').text(latestDate);
+
+      // Fill table
+      const tbody = $('#aggregateTable tbody');
+      tbody.empty();
+
+      aggregate
+        .sort((a, b) => String(b.date).localeCompare(String(a.date))) // newest first
+        .forEach(item => {
+          tbody.append(`
+            <tr class="hover:bg-slate-50 cursor-pointer" data-date="${escapeHtml(item.date)}">
+              <td class="py-3 px-2">${escapeHtml(item.date)}</td>
+              <td class="py-3 px-2 font-semibold">${escapeHtml(item.total)}</td>
+              <td class="py-3 px-2">
+                <span class="text-sm text-blue-700 hover:underline">View</span>
+              </td>
+            </tr>
+          `);
+        });
+
+      // DataTables init / refresh
+      if (aggregateTableInstance) {
+        aggregateTableInstance.destroy();
+      }
+      aggregateTableInstance = $('#aggregateTable').DataTable({
+        pageLength: 10,
+        lengthMenu: [5, 10, 25, 50],
+        order: [[0, 'desc']],
+        responsive: true
+      });
+
+    } catch (err) {
+      showError(err?.statusText || err?.message || String(err));
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  async function loadDetails(date) {
+    $('#modalDate').text(date);
+    $('#detailError').addClass('hidden').text('');
+    $('#detailLoading').removeClass('hidden');
+    $('#detailTbody').empty();
+    $('#chipSent').text('Sent: —');
+    $('#chipFailed').text('Failed: —');
+    $('#chipTotal').text('Total: —');
+
+    openModal();
+
+    try {
       const detailURL = dashboardBaseURL + `dashboard-${date}.json`;
       const detailData = await $.getJSON(detailURL);
+      renderDetailRows(detailData);
+    } catch (err) {
+      $('#detailError').removeClass('hidden').text(err?.statusText || err?.message || String(err));
+    } finally {
+      $('#detailLoading').addClass('hidden');
+    }
+  }
 
-      const detailTbody = $('#detailTable tbody');
-      detailTbody.empty();
+  function copyVisibleRows() {
+    const lines = [];
+    $('#detailTbody tr:visible').each(function() {
+      const num = $(this).find('td').eq(0).text().trim();
+      const st = $(this).find('td').eq(1).text().trim();
+      lines.push(`${num}\t${st}`);
+    });
+    navigator.clipboard.writeText(lines.join('\n'));
+  }
 
-      detailData.sent.forEach(num => {
-        detailTbody.append(`<tr><td class="p-2 border">${num}</td><td class="p-2 border text-green-600">Sent</td></tr>`);
-      });
+  $(document).ready(function() {
+    loadAggregate();
 
-      detailData.failed.forEach(num => {
-        detailTbody.append(`<tr><td class="p-2 border">${num}</td><td class="p-2 border text-red-600">Failed</td></tr>`);
-      });
+    $('#refreshBtn').on('click', loadAggregate);
 
-      $('#detailModal').removeClass('hidden').addClass('flex');
+    // Click row -> modal
+    $('#aggregateTable tbody').on('click', 'tr', function() {
+      const date = $(this).data('date');
+      if (date) loadDetails(date);
     });
 
-    $('#closeModal').click(() => {
-      $('#detailModal').addClass('hidden').removeClass('flex');
+    // Modal close actions
+    $('#closeModal, #closeModalFooter').on('click', closeModal);
+    $('#detailModal').on('click', function(e) {
+      // click backdrop closes
+      if (e.target === this) closeModal();
     });
+    $(document).on('keydown', function(e) {
+      if (e.key === 'Escape' && !$('#detailModal').hasClass('hidden')) closeModal();
+    });
+
+    // Modal filter/search
+    $('#statusFilter').on('change', applyDetailFilter);
+    $('#detailSearch').on('input', applyDetailFilter);
+
+    // Copy
+    $('#copyBtn').on('click', copyVisibleRows);
   });
 </script>
-
 
 </body>
 </html>
