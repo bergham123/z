@@ -1,74 +1,85 @@
 name: WhatsApp Bot Send
 
 on:
-  workflow_dispatch: # Trigger manually from GitHub Actions tab
+  workflow_dispatch:
 
 jobs:
   send-messages:
     runs-on: ubuntu-latest
-    timeout-minutes: 15 # Give enough time to scan QR
+    timeout-minutes: 15
 
     steps:
-      # ─── Checkout repo (Restores previous Session) ──────
-      - name: Checkout repo
+      - name: Checkout repo (Restores Session)
         uses: actions/checkout@v4
 
-      # ─── Setup Node.js ───────────────────────────────────
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # ─── Install dependencies ────────────────────────────
       - name: Install dependencies
         run: npm install
 
-      # ─── Run WhatsApp bot (Background) ──────────────────
-      # We run it in background so we can check for the QR file
-      - name: Run bot
+      # ─── 1. Start Bot in Background ───────────────────────
+      - name: Run Bot
         run: npm start &
-      
-      # ─── Handle QR Code (First Run Only) ─────────────────
-      - name: Wait for QR Code
+        # The '&' allows this step to finish so the next one runs immediately
+
+      # ─── 2. Wait and Check if QR is Needed ────────────────
+      - name: Check Authentication Status
+        id: check_auth
         run: |
-          echo "Waiting for bot to generate QR..."
-          # Wait up to 60 seconds for qr.png to appear
-          timeout 60s bash -c "until [ -f ./qr.png ]; do sleep 1; done"
-          echo "QR Code found!"
-      
+          echo "Waiting 15 seconds for WhatsApp handshake..."
+          sleep 15
+          
+          if [ -f ./qr.png ]; then
+            echo "::notice::SESSION INVALID! QR Code generated."
+            echo "::notice::Go to 'Artifacts' (bottom of this page) to scan."
+            echo "needs_scan=true" >> $GITHUB_OUTPUT
+          else
+            echo "::notice::SESSION VALID! No scan needed."
+            echo "needs_scan=false" >> $GITHUB_OUTPUT
+          fi
+
+      # ─── 3. Upload QR (Only if needed) ────────────────────
       - name: Upload QR Code
-        if: success()
+        if: steps.check_auth.outputs.needs_scan == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: qr-code
+          name: whatsapp-qr-code
           path: ./qr.png
           retention-days: 1
 
-      # ─── Wait for Bot to Finish Work ─────────────────────
-      # Now we bring the background process to foreground to see logs
-      - name: Wait for messages to send
+      # ─── 4. Pause for User to Scan (Only if needed) ───────
+      # If QR exists, we wait indefinitely until user scans and bot becomes ready
+      - name: Waiting for User to Scan...
+        if: steps.check_auth.outputs.needs_scan == 'true'
         run: |
-          echo "Bot is running. Scan the QR if this is the first time."
-          echo "Waiting for process to finish..."
+          echo "⏳ Waiting for you to scan the QR code..."
+          echo "The script is running in the background. Once scanned, it will proceed."
+          
+          # Monitor if qr.png disappears (bot deletes it on success) or check logs
+          # Simple wait is enough because the bot keeps running
+          sleep 300 # Wait up to 5 mins for scan
+
+      # ─── 5. Wait for Bot to Finish Sending ────────────────
+      - name: Monitor Bot Progress
+        run: |
+          echo "🤖 Bot is working. Monitoring logs..."
+          # 'wait' waits for the background process (npm start) to finish
           wait
 
-      # ─── Save Session (The "Save Game") ───────────────────
-      # This saves the folder so you NEVER have to scan again
+      # ─── 6. Save Updated Session ───────────────────────────
       - name: Save Session & Progress
-        if: always() # Run even if there are errors
+        if: always()
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Add the session folder (using -f because it might be ignored)
-          # .wwebjs_auth is the folder where LocalAuth saves the token
+          # Add Session (force add in case it's in gitignore)
+          # If session was expired, this saves the NEW valid one
           git add -f .wwebjs_auth
           
-          # Add progress and logs
           git add progress.json messages.txt
-          
-          # Commit
-          git commit -m "Update session and progress [skip ci]" || echo "No changes to commit"
-          
-          # Push
+          git commit -m "Update session/progress [skip ci]" || echo "No changes"
           git push
