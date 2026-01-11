@@ -1,78 +1,26 @@
-name: WhatsApp Bot Send
+name: WhatsApp Automation
 
 on:
   workflow_dispatch:
 
 jobs:
-  send-messages:
+  run:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install dependencies
-        run: npm install
+      - run: npm install
+      - run: npm start
 
-      # ─── 1. Start Bot in Background ───────────────────────
-      - name: Run Bot
-        run: npm start &
-
-      # ─── 2. Wait and Check for QR ─────────────────────────
-      - name: Check for QR Code
-        id: check_qr
+      - name: Commit dashboard
         run: |
-          echo "Waiting 20 seconds for WhatsApp to initialize..."
-          sleep 20
-          
-          echo "--- Listing files in current directory ---"
-          ls -l
-          echo "------------------------------------------"
-          
-          if [ -f ./qr.png ]; then
-            echo "✅ SUCCESS: qr.png file found!"
-            echo "needs_scan=true" >> $GITHUB_OUTPUT
-          else
-            echo "❌ ERROR: qr.png file NOT found."
-            echo "The bot might have crashed. Check logs above."
-            echo "needs_scan=false" >> $GITHUB_OUTPUT
-          fi
-
-      # ─── 3. Upload QR Code ───────────────────────────────
-      - name: Upload QR Code Artifact
-        if: steps.check_qr.outputs.needs_scan == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: whatsapp-qr-code
-          path: ./qr.png
-          retention-days: 1
-
-      # ─── 4. Give User Time to Scan ─────────────────────────
-      - name: Waiting for Scan...
-        if: steps.check_qr.outputs.needs_scan == 'true'
-        run: |
-          echo ""
-          echo "█████████████████████████████████████████████"
-          echo "  IMPORTANT: QR CODE IS READY TO SCAN!"
-          echo "  SCROLL DOWN TO THE BOTTOM OF THIS PAGE."
-          echo "  LOOK FOR THE 'ARTIFACTS' SECTION."
-          echo "  DOWNLOAD 'whatsapp-qr-code' AND SCAN IT."
-          echo "█████████████████████████████████████████████"
-          echo ""
-          echo "⏳ I will wait here for up to 5 minutes while you scan..."
-          # We sleep here so the workflow doesn't finish
-          # Once you scan, the bot (running in bg) will finish the job
-          sleep 300
-
-      # ─── 5. Finalize / Save Session ───────────────────────
-      - name: Finish & Save
-        if: always()
-        run: |
-          echo "Job finishing up..."
-          # (The background process ends automatically when done)
+          git config user.name "bot"
+          git config user.email "bot@github.com"
+          git add .
+          git commit -m "update dashboard $(date +%F)" || echo "No changes"
+          git push
