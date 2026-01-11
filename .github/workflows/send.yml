@@ -22,10 +22,16 @@ jobs:
       - run: npm install
       - run: npm start
 
-      - name: Commit dashboard
+     - name: Commit dashboard
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add .
+
+          # ignore files ONLY in actions
+          git update-index --assume-unchanged .wwebjs_cache || true
+          git update-index --assume-unchanged package-lock.json || true
+          git update-index --assume-unchanged node_modules || true
+
+          git add dashboard
           git commit -m "update dashboard $(date +%F)" || echo "No changes"
           git push
