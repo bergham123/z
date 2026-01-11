@@ -11,6 +11,8 @@ jobs:
       # ─── Checkout repo ─────────────────────
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       # ─── Setup Node.js ────────────────────
       - name: Setup Node.js
@@ -20,17 +22,48 @@ jobs:
 
       # ─── Install dependencies ─────────────
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg ca-certificates
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst fonts-freefont-ttf libxss1 --no-install-recommends
+
+      # ─── Create session directory ─────────
+      - name: Create session directory
+        run: |
+          mkdir -p .wwebjs_auth
+          ls -la .wwebjs_auth/ || echo "No session directory yet"
 
       # ─── Run WhatsApp bot ─────────────────
       - name: Run bot
-        run: node index.js
+        timeout-minutes: 30
+        env:
+          DISPLAY: ":99"
+        run: |
+          # Start virtual display for headless Chrome
+          /usr/bin/Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+          sleep 3
+          
+          # Run the bot
+          echo "Starting WhatsApp bot..."
+          node index.js || echo "Bot finished or encountered an error"
 
-      # ─── Commit progress and logs back ────
-      - name: Commit progress and logs
+      # ─── Commit progress, logs and session back ────
+      - name: Commit progress, logs and session
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add progress.json messages.txt
-          git commit -m "Update progress and logs [skip ci]" || echo "No changes to commit"
-          git push
+          
+          # Add all changed files
+          git add progress.json messages.txt .wwebjs_auth/
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update progress, logs and session [skip ci]"
+            git push
+          fi
