@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Checkout repo (Restores Session)
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -23,63 +23,56 @@ jobs:
       # ─── 1. Start Bot in Background ───────────────────────
       - name: Run Bot
         run: npm start &
-        # The '&' allows this step to finish so the next one runs immediately
 
-      # ─── 2. Wait and Check if QR is Needed ────────────────
-      - name: Check Authentication Status
-        id: check_auth
+      # ─── 2. Wait and Check for QR ─────────────────────────
+      - name: Check for QR Code
+        id: check_qr
         run: |
-          echo "Waiting 15 seconds for WhatsApp handshake..."
-          sleep 15
+          echo "Waiting 20 seconds for WhatsApp to initialize..."
+          sleep 20
+          
+          echo "--- Listing files in current directory ---"
+          ls -l
+          echo "------------------------------------------"
           
           if [ -f ./qr.png ]; then
-            echo "::notice::SESSION INVALID! QR Code generated."
-            echo "::notice::Go to 'Artifacts' (bottom of this page) to scan."
+            echo "✅ SUCCESS: qr.png file found!"
             echo "needs_scan=true" >> $GITHUB_OUTPUT
           else
-            echo "::notice::SESSION VALID! No scan needed."
+            echo "❌ ERROR: qr.png file NOT found."
+            echo "The bot might have crashed. Check logs above."
             echo "needs_scan=false" >> $GITHUB_OUTPUT
           fi
 
-      # ─── 3. Upload QR (Only if needed) ────────────────────
-      - name: Upload QR Code
-        if: steps.check_auth.outputs.needs_scan == 'true'
+      # ─── 3. Upload QR Code ───────────────────────────────
+      - name: Upload QR Code Artifact
+        if: steps.check_qr.outputs.needs_scan == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: whatsapp-qr-code
           path: ./qr.png
           retention-days: 1
 
-      # ─── 4. Pause for User to Scan (Only if needed) ───────
-      # If QR exists, we wait indefinitely until user scans and bot becomes ready
-      - name: Waiting for User to Scan...
-        if: steps.check_auth.outputs.needs_scan == 'true'
+      # ─── 4. Give User Time to Scan ─────────────────────────
+      - name: Waiting for Scan...
+        if: steps.check_qr.outputs.needs_scan == 'true'
         run: |
-          echo "⏳ Waiting for you to scan the QR code..."
-          echo "The script is running in the background. Once scanned, it will proceed."
-          
-          # Monitor if qr.png disappears (bot deletes it on success) or check logs
-          # Simple wait is enough because the bot keeps running
-          sleep 300 # Wait up to 5 mins for scan
+          echo ""
+          echo "█████████████████████████████████████████████"
+          echo "  IMPORTANT: QR CODE IS READY TO SCAN!"
+          echo "  SCROLL DOWN TO THE BOTTOM OF THIS PAGE."
+          echo "  LOOK FOR THE 'ARTIFACTS' SECTION."
+          echo "  DOWNLOAD 'whatsapp-qr-code' AND SCAN IT."
+          echo "█████████████████████████████████████████████"
+          echo ""
+          echo "⏳ I will wait here for up to 5 minutes while you scan..."
+          # We sleep here so the workflow doesn't finish
+          # Once you scan, the bot (running in bg) will finish the job
+          sleep 300
 
-      # ─── 5. Wait for Bot to Finish Sending ────────────────
-      - name: Monitor Bot Progress
-        run: |
-          echo "🤖 Bot is working. Monitoring logs..."
-          # 'wait' waits for the background process (npm start) to finish
-          wait
-
-      # ─── 6. Save Updated Session ───────────────────────────
-      - name: Save Session & Progress
+      # ─── 5. Finalize / Save Session ───────────────────────
+      - name: Finish & Save
         if: always()
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Add Session (force add in case it's in gitignore)
-          # If session was expired, this saves the NEW valid one
-          git add -f .wwebjs_auth
-          
-          git add progress.json messages.txt
-          git commit -m "Update session/progress [skip ci]" || echo "No changes"
-          git push
+          echo "Job finishing up..."
+          # (The background process ends automatically when done)
