@@ -1,4 +1,6 @@
-import { Client, LocalAuth } from "whatsapp-web.js";
+import pkg from "whatsapp-web.js";
+const { Client, LocalAuth } = pkg;
+
 import qrcode from "qrcode-terminal";
 import fs from "fs-extra";
 
@@ -51,11 +53,10 @@ client.on("ready", async () => {
       console.log(`✔ Sent to ${num}`);
     } catch (err) {
       dashboard.failed.push(num);
-      console.log(`❌ Failed ${num}`);
+      console.log(`❌ Failed ${num}`, err.message);
     }
 
     const delay = randomDelay();
-    console.log(`⏳ Waiting ${delay / 1000}s`);
     await wait(delay);
   }
 
@@ -63,12 +64,11 @@ client.on("ready", async () => {
 
   await client.sendMessage(
     ADMIN_NUMBER,
-    `✅ WhatsApp Automation Finished
-📅 Date: ${today}
+    `✅ Finished
+📅 ${today}
 📤 Total Sent: ${dashboard.total}`
   );
 
-  console.log("📊 Dashboard saved");
   process.exit(0);
 });
 
