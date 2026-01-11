@@ -1,4 +1,4 @@
 node_modules
 .DS_Store
-.wwebjs_auth  #<-- Make sure this line is DELETED or commented out!
+.wwebjs_auth 
 .env
