@@ -1,2 +1,3 @@
-2026/01/11-17:41:41.320 917 Creating DB /home/runner/work/z/z/session/session-main/Default/shared_proto_db/metadata since it was missing.
-2026/01/11-17:41:41.324 917 Reusing MANIFEST /home/runner/work/z/z/session/session-main/Default/shared_proto_db/metadata/MANIFEST-000001
+2026/01/11-17:57:58.677 8ac Reusing MANIFEST /home/runner/work/z/z/session/session-main/Default/shared_proto_db/metadata/MANIFEST-000001
+2026/01/11-17:57:58.678 8ac Recovering log #3
+2026/01/11-17:57:58.678 8ac Reusing old log /home/runner/work/z/z/session/session-main/Default/shared_proto_db/metadata/000003.log 
