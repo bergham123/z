@@ -27,13 +27,12 @@ jobs:
       - name: Run WhatsApp bot
         run: npm start
 
-      - name: Commit dashboard (CI ignore)
+      - name: Commit session & dashboard
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-
-          # commit only dashboards
-          git add dashboard
-          git commit -m "update dashboard $(date +%F)" || echo "No changes"
+          # add only session + dashboard
+          git add session dashboard
+          git commit -m "update session & dashboard $(date +%F)" || echo "No changes"
           git push
