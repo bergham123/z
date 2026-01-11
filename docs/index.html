@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>WhatsApp Automation Dashboard</title>
 
-  <!-- Tailwind -->
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.3/dist/tailwind.min.css" rel="stylesheet">
+  <!-- Tailwind CDN (latest stable) -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- jQuery + DataTables -->
-  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+  <!-- jQuery + DataTables (reliable) -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 
   <style>
-    /* Make DataTables play nicer with Tailwind */
+    /* Tailwind + DataTables adjustments */
     .dataTables_wrapper .dataTables_filter input,
     .dataTables_wrapper .dataTables_length select {
       border: 1px solid #e5e7eb;
@@ -24,8 +24,8 @@
     }
     .dataTables_wrapper .dataTables_filter input:focus,
     .dataTables_wrapper .dataTables_length select:focus {
-      border-color: #93c5fd;
-      box-shadow: 0 0 0 3px rgba(147,197,253,0.35);
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.25);
     }
     table.dataTable thead th {
       border-bottom: 1px solid #e5e7eb !important;
@@ -37,11 +37,13 @@
       border-radius: 0.5rem !important;
       border: 1px solid transparent !important;
       margin: 0 2px !important;
+      padding: 0.3rem 0.6rem !important;
+      transition: all 0.2s;
     }
     .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-      background: #111827 !important;
+      background: #1f2937 !important;
       color: white !important;
-      border: 1px solid #111827 !important;
+      border: 1px solid #1f2937 !important;
     }
     .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
       background: #f3f4f6 !important;
@@ -50,50 +52,47 @@
     }
   </style>
 </head>
+<body class="min-h-screen bg-slate-50 text-slate-900 font-sans">
 
-<body class="min-h-screen bg-slate-50 text-slate-900">
-  <div class="max-w-6xl mx-auto px-4 py-8">
+  <div class="max-w-7xl mx-auto px-4 py-10">
 
     <!-- Header -->
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-10">
       <div>
-        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">WhatsApp Automation Dashboard</h1>
-        <p class="text-slate-600 mt-1">Daily sending summary + per-day delivery details.</p>
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">WhatsApp Automation Dashboard</h1>
+        <p class="text-slate-500 mt-1">Daily sending summary & per-day delivery details.</p>
       </div>
 
-      <div class="flex items-center gap-2">
-        <button id="refreshBtn"
-          class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 active:scale-[0.99] transition">
-          <span class="font-medium">Refresh</span>
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
-            <path d="M21 3v6h-6"/>
-          </svg>
-        </button>
+      <button id="refreshBtn" class="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-2 text-white font-medium shadow hover:bg-blue-500 active:scale-95 transition-transform">
+        Refresh
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+          <path d="M21 3v6h-6"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
+      <div class="bg-white rounded-3xl shadow-lg border border-slate-200 p-6 transition hover:shadow-xl">
+        <div class="text-sm text-slate-400">Total Days</div>
+        <div id="statDays" class="mt-2 text-3xl font-bold text-slate-800">—</div>
+      </div>
+      <div class="bg-white rounded-3xl shadow-lg border border-slate-200 p-6 transition hover:shadow-xl">
+        <div class="text-sm text-slate-400">Total Sent (All Days)</div>
+        <div id="statTotal" class="mt-2 text-3xl font-bold text-slate-800">—</div>
+      </div>
+      <div class="bg-white rounded-3xl shadow-lg border border-slate-200 p-6 transition hover:shadow-xl">
+        <div class="text-sm text-slate-400">Latest Date</div>
+        <div id="statLatest" class="mt-2 text-3xl font-bold text-slate-800">—</div>
       </div>
     </div>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-      <div class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
-        <div class="text-sm text-slate-500">Total Days</div>
-        <div id="statDays" class="mt-2 text-2xl font-bold">—</div>
-      </div>
-      <div class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
-        <div class="text-sm text-slate-500">Total Sent (All Days)</div>
-        <div id="statTotal" class="mt-2 text-2xl font-bold">—</div>
-      </div>
-      <div class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
-        <div class="text-sm text-slate-500">Latest Date</div>
-        <div id="statLatest" class="mt-2 text-2xl font-bold">—</div>
-      </div>
-    </div>
-
-    <!-- Table Card -->
-    <div class="rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+    <!-- Aggregate Table Card -->
+    <div class="bg-white rounded-3xl shadow-lg border border-slate-200 overflow-hidden transition hover:shadow-xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
         <div>
-          <h2 class="font-semibold">Daily Aggregate</h2>
+          <h2 class="text-lg font-semibold text-slate-900">Daily Aggregate</h2>
           <p class="text-sm text-slate-500">Click a row to view numbers and statuses.</p>
         </div>
         <div id="loadingBadge" class="hidden text-sm text-slate-600">
@@ -104,52 +103,48 @@
         </div>
       </div>
 
-      <div class="p-5">
+      <div class="p-6">
         <div id="errorBox" class="hidden mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
           <div class="font-semibold">Couldn’t load data.</div>
           <div class="text-sm mt-1" id="errorText"></div>
         </div>
 
-        <table id="aggregateTable" class="display w-full">
+        <table id="aggregateTable" class="display w-full text-sm">
           <thead>
-            <tr>
-              <th>Date</th>
-              <th>Total Sent</th>
-              <th>Open</th>
+            <tr class="bg-slate-50">
+              <th class="p-3 text-left">Date</th>
+              <th class="p-3 text-left">Total Sent</th>
+              <th class="p-3 text-left">Open</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
 
-        <p class="text-xs text-slate-500 mt-3">
-          Tip: Use the search box above the table to quickly find a specific date.
-        </p>
+        <p class="text-xs text-slate-400 mt-3">Tip: Use the search box above to quickly find a specific date.</p>
       </div>
     </div>
+
   </div>
 
-  <!-- Modal -->
+  <!-- Detail Modal -->
   <div id="detailModal" class="fixed inset-0 z-50 hidden">
-    <div class="absolute inset-0 bg-black/50"></div>
-
-    <div class="relative mx-auto my-8 w-[95%] max-w-4xl">
-      <div class="rounded-2xl bg-white shadow-xl border border-slate-200 overflow-hidden">
-        <div class="flex items-start justify-between px-5 py-4 border-b border-slate-200">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+    <div class="relative mx-auto my-12 w-[95%] max-w-4xl transition-transform transform scale-95">
+      <div class="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div class="flex items-start justify-between px-6 py-4 border-b border-slate-200">
           <div>
-            <h3 class="text-lg font-bold">Details</h3>
+            <h3 class="text-lg font-bold text-slate-900">Details</h3>
             <p class="text-sm text-slate-500">For <span id="modalDate" class="font-semibold text-slate-700"></span></p>
           </div>
-
-          <button id="closeModal" class="rounded-xl p-2 hover:bg-slate-100 active:scale-[0.98] transition" aria-label="Close">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <button id="closeModal" class="rounded-xl p-2 hover:bg-slate-100 active:scale-95 transition">
+            <svg class="w-5 h-5 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 6 6 18M6 6l12 12"/>
             </svg>
           </button>
         </div>
 
-        <div class="px-5 py-4">
-          <!-- Modal controls -->
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <div class="px-6 py-4">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <div class="flex items-center gap-2">
               <span id="chipSent" class="text-xs rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1">Sent: —</span>
               <span id="chipFailed" class="text-xs rounded-full bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1">Failed: —</span>
@@ -157,20 +152,16 @@
             </div>
 
             <div class="flex items-center gap-2">
-              <select id="statusFilter"
-                class="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-blue-100">
+              <select id="statusFilter" class="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">
                 <option value="all">All</option>
                 <option value="sent">Sent</option>
                 <option value="failed">Failed</option>
               </select>
-
-              <input id="detailSearch" type="text" placeholder="Search number…"
-                class="w-full sm:w-64 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-blue-100">
+              <input id="detailSearch" type="text" placeholder="Search number…" class="w-full sm:w-64 rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">
             </div>
           </div>
 
-          <!-- Table container -->
-          <div class="max-h-[65vh] overflow-auto rounded-xl border border-slate-200">
+          <div class="max-h-[65vh] overflow-auto rounded-2xl border border-slate-200">
             <table class="w-full text-sm">
               <thead class="sticky top-0 bg-slate-50 border-b border-slate-200">
                 <tr>
@@ -188,25 +179,19 @@
               Loading details…
             </span>
           </div>
-
           <div id="detailError" class="hidden mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm"></div>
 
           <div class="mt-5 flex justify-end gap-2">
-            <button id="copyBtn"
-              class="rounded-xl border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50 active:scale-[0.99] transition">
-              Copy visible
-            </button>
-            <button id="closeModalFooter"
-              class="rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 active:scale-[0.99] transition">
-              Done
-            </button>
+            <button id="copyBtn" class="rounded-2xl border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50 active:scale-95 transition">Copy visible</button>
+            <button id="closeModalFooter" class="rounded-2xl bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-500 active:scale-95 transition">Done</button>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-<script>
+  <!-- JS (your existing scripts) -->
+  <script>
   const aggregateFile = 'https://raw.githubusercontent.com/bergham123/z/main/aggregate.json';
   const dashboardBaseURL = 'https://raw.githubusercontent.com/bergham123/z/main/dashboard/';
 
