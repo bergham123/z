@@ -1,40 +1,119 @@
-<form id="dataForm">
-  <input type="text" id="name" placeholder="Your name" required />
-  <input type="text" id="message" placeholder="Your message" required />
-  <button type="submit">Save</button>
-</form>
-<p id="status"></p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Save Numbers to GitHub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+
+  <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
+    <h1 class="text-xl font-bold mb-4 text-center">
+      Add Number to accounts.json
+    </h1>
+
+    <input
+      id="numberInput"
+      type="text"
+      placeholder="Enter phone number"
+      class="w-full border rounded px-3 py-2 mb-3 focus:outline-none focus:ring"
+    />
+
+    <button
+      onclick="saveNumber()"
+      class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+    >
+      Save Number
+    </button>
+
+    <p id="status" class="text-center text-sm mt-3"></p>
+  </div>
 
 <script>
-async function updateAccounts(newNumber) {
-  const filePath = 'accounts.json';
-  const token = 'YOUR_GITHUB_PERSONAL_ACCESS_TOKEN';
+const OWNER = "bergham123";
+const REPO = "z";
+const FILE_PATH = "accounts.json";
+const TOKEN = "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"; // ⚠️ PUT YOUR TOKEN HERE
 
-  // 1️⃣ Fetch existing file
-  const fileResp = await fetch(`https://api.github.com/repos/bergham123/z/contents/${filePath}`);
-  const fileData = await fileResp.json();
-  const sha = fileData.sha;
-  const content = JSON.parse(atob(fileData.content));
+async function saveNumber() {
+  const input = document.getElementById("numberInput");
+  const status = document.getElementById("status");
+  const newNumber = input.value.trim();
 
-  // 2️⃣ Add new number
-  content.push(newNumber);
+  if (!newNumber) {
+    status.textContent = "❌ Please enter a number";
+    status.className = "text-red-600 text-center text-sm mt-3";
+    return;
+  }
 
-  // 3️⃣ Update file
-  const updateResp = await fetch(`https://api.github.com/repos/bergham123/z/contents/${filePath}`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `token ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      message: 'Update accounts.json',
-      content: btoa(JSON.stringify(content, null, 2)),
-      sha: sha
-    })
-  });
+  status.textContent = "⏳ Saving...";
+  status.className = "text-gray-600 text-center text-sm mt-3";
 
-  const result = await updateResp.json();
-  console.log(result);
+  try {
+    // 1️⃣ Fetch existing accounts.json
+    const res = await fetch(
+      `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
+      {
+        headers: {
+          Authorization: `token ${TOKEN}`
+        }
+      }
+    );
+
+    let data = [];
+    let sha = null;
+
+    if (res.ok) {
+      const json = await res.json();
+      sha = json.sha;
+      data = JSON.parse(atob(json.content));
+    }
+
+    // 2️⃣ Avoid duplicates
+    if (data.includes(newNumber)) {
+      status.textContent = "⚠️ Number already exists";
+      status.className = "text-yellow-600 text-center text-sm mt-3";
+      return;
+    }
+
+    data.push(newNumber);
+
+    // 3️⃣ Update file
+    const update = await fetch(
+      `https://api.github.com/repos/${OWNER}/${REPO}/docs/${FILE_PATH}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `token ${TOKEN}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: "Add number to accounts.json",
+          content: btoa(JSON.stringify(data, null, 2)),
+          sha: sha
+        })
+      }
+    );
+
+    if (!update.ok) {
+      throw new Error("GitHub update failed");
+    }
+
+    status.textContent = "✅ Number saved successfully";
+    status.className = "text-green-600 text-center text-sm mt-3";
+    input.value = "";
+
+  } catch (err) {
+    console.error(err);
+    status.textContent = "❌ Error saving number";
+    status.className = "text-red-600 text-center text-sm mt-3";
+  }
 }
 </script>
+
+</body>
+</html>
