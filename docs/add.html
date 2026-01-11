@@ -84,7 +84,7 @@ async function saveNumber() {
 
     // 3️⃣ Update file
     const update = await fetch(
-      `https://api.github.com/repos/${OWNER}/${REPO}/docs/${FILE_PATH}`,
+      `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
       {
         method: "PUT",
         headers: {
